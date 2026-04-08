@@ -29,26 +29,31 @@ if inpt:
     if result:
         for i in result["recordings"][:100]:
             artist_info = i.get("artist-credit", [{}])
-            release_info = i.get("releases", [{}])[0]
+            release_info = i.get("releases", [{}])
+            release_count = len(release_info)
+
+            first_release = release_info[0] if release_info else {}
 
             song_data = {
                 "Song": i.get("title", "Unknown"),
                 "Artist": artist_info[0].get("name", "Unknown Artist"),
-                "Album": release_info.get("title", "Single"),
-                "Release Date": release_info.get("date", "No date"),
+                "Album": first_release.get("title", "Single"),
+                "Release Date": first_release.get("date", "No date"),
+                "Internal Popularity": release_count,
                 "Score": int(i.get("score", 0))
             }
 
             songs.append(song_data)
 
-        songs.sort(key = lambda x: x["Score"], reverse=True)
+        songs.sort(key=lambda x: (x["Internal Popularity"], x["Score"]), reverse=True)
 
         for x in songs:
             del x["Score"]
+            del x["Internal Popularity"]
         st.table(songs[:25], border="horizontal")
 
     else:
-        st.info("Keine Suche gefunden")
+        st.info("No Entries.")
 
 # lyrics = f"https://api.lyrics.ovh/v1/{artist}/{song}"
 # show_lyrics = requests.get(lyrics)
