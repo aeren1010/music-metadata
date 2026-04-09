@@ -1,3 +1,5 @@
+# LIBRARIES
+
 from streamlit import rerun
 from urllib.parse import quote
 import streamlit as st
@@ -6,7 +8,12 @@ from config import headers, search_url, lyrics_url
 
 st.title("Music Metadata")
 
+# SINGLE SONG SITE
+
 if st.session_state.get("song"):
+
+    # VARS FOR SELECTED SONG DATA
+
     sng = st.session_state["song"]
     artist_info = sng.get("artist-credit", [{}])
     release_info = sng.get("releases", [])
@@ -16,6 +23,8 @@ if st.session_state.get("song"):
     new_cover = None
 
     st.header(f"Song: {sng["Song"]}")
+
+    # GET COVER ART FROM RELEASES
 
     for release in release_info[:10]:
         rmbid = release.get("id")
@@ -35,6 +44,7 @@ if st.session_state.get("song"):
         st.session_state["song"] = None
         st.rerun()
 
+    # GATHER EXTRA COLLTECTED SONG DATA
 
     selected_song_data = {
         "Song Name": sng["Song"],
@@ -52,10 +62,12 @@ if st.session_state.get("song"):
 
     st.table(selected_song_data, border="horizontal")
 
+    # VARS FOR API REQUESTS
+
     l_artist = sng["Artist"]
     l_song = sng["Song"]
 
-    lyrics = f"https://api.lyrics.ovh/v1/{l_artist}/{l_song}"
+    lyrics = f"{lyrics_url}{l_artist}/{l_song}"
     show_lyrics = requests.get(lyrics)
     raw_lyrics = show_lyrics.json()
     formatted_lyrics = raw_lyrics.get("lyrics", "No lyrics")
@@ -65,18 +77,26 @@ if st.session_state.get("song"):
     youtube_link = f"https://www.youtube.com/results?search_query={song_query}"
     apple_link = f"https://music.apple.com/search?term={song_query}"
 
+    # STREAMING PLATFORMS
+
     st.subheader(f"Stream {sng["Song"]} on...")
     plat1, plat2, plat3 = st.columns(3)
     plat1.link_button("Spotify", spotify_link, use_container_width=True)
     plat2.link_button("YouTube", youtube_link, use_container_width=True)
     plat3.link_button("Apple Music", apple_link, use_container_width=True)
 
+    # LYRICS
+
     if show_lyrics.status_code == 200:
         st.subheader("Lyrics")
         st.text(formatted_lyrics)
 
+# SEARCH SITE
+
 else:
     inpt = st.text_input(label="Search", type="default", help="Type in your favourite artist and see what results you get.", placeholder="Search for a song or an artist", icon="🔎")
+
+    # CACHE RESULTS
 
     @st.cache_data
     def search(query_value):
@@ -99,7 +119,13 @@ else:
         songs = []
 
         if result:
+
+            # TRIM RESULTS TO 100 ENTRIES
+
             for i in result["recordings"][:100]:
+
+                # VARS FOR SONG DATA
+
                 artist_info = i.get("artist-credit", [{}])
                 release_info = i.get("releases", [])
                 release_count = len(release_info)
@@ -116,13 +142,15 @@ else:
                 if country == "XW":
                     country = "Worldwide"
 
+                # GET EVERY DATA OF THE SONG
+
                 song_data = {
                     "Song": i.get("title", "Unknown"),
                     "Artist": artist_info[0].get("name", "Unknown Artist"),
                     "Album": first_release.get("title", "Single"),
                     "Release Date": first_release.get("date", "No date"),
                     "Full Credits": artist_info,
-                    "Internal Popularity": release_count,
+                    "Internal Popularity": release_count, # SINCE MUSICBRAINZ OFFERS NO DATA TO ASSESS THE SONGS BASED ON THEIR POPULARITY FOR BETTER SEARCH RESULTS, WE'RE CREATING AN OWN POPULARITY SYSTEM BY RANKING THE SONGS DEPENDING ON THEIR RELEASES. POPULAR SONGS TEND TO HAVE MANY RELEASES.
                     "Score": int(i.get("score", 0)),
                     "Length": duration,
                     "ISRC": i.get("isrcs", ["N/A"])[0],
@@ -135,7 +163,11 @@ else:
 
                 songs.append(song_data)
 
+            # SORT BY THE INTERNAL POPULARITY + MUSICBRAINZ MATCHING SCORE
+
             songs.sort(key=lambda x: (x["Internal Popularity"], x["Score"]), reverse=True)
+
+            # CREATE AN EMPTY TABLE WHERE ONLY CHOSEN ELEMENTS WILL APPEAR IN
 
             visualtable = []
             for x in songs:
@@ -146,6 +178,8 @@ else:
                 })
             stable = st.dataframe(visualtable[:25], on_select="rerun", selection_mode="single-row")
             
+            # IF A SONG IS SELECTED, LOG IT TO THE SESSION STATE AND RERUN THE STREAMLIT PAGE SO THE CONDITION APPLIES TO LAND AT THE DETAILED PAGE FOR THE SONG.
+
             if stable.selection.rows:
                 selected_song = stable.selection.rows[0]
                 st.session_state["song"] = songs[selected_song]
